@@ -50,7 +50,6 @@ IF(WIN32)
 ENDIF()
 
 get_filename_component(incdir ../include ABSOLUTE)
-message(STATUS "incdir=${incdir}")
 get_filename_component(incdir_int ../src/internal_includes ABSOLUTE)
 get_filename_component(srcdir ../src ABSOLUTE)
 get_filename_component(cbstringdir ../src/cbstring ABSOLUTE)
@@ -90,6 +89,15 @@ ${CBSTRING_CFILES}
 ADD_LIBRARY( libHLSLcc ${libHLSLcc_SOURCES} )
 LIST(APPEND targets libHLSLcc)
 
+file(GLOB pub_headers "${incdir}/*.h" "${srcdir}/*.h" "${cbstringdir}/*.h")
+file(GLOB prv_headers "${incdir_int}/*.h")
+message(STATUS "pub_headers=${pub_headers}")
+message(STATUS "prv_headers=${prv_headers}")
+
+set_target_properties(libHLSLcc PROPERTIES
+    PUBLIC_HEADER "${pub_headers}"
+    PRIVATE_HEADER "${prv_headers}")
+
 # Define headers for this library. PUBLIC headers are used for
 # compiling the library, and will be added to consumers' build
 # paths.
@@ -102,7 +110,6 @@ target_include_directories(libHLSLcc
     PRIVATE ${incdir_int}
     )
 
-INCLUDE_DIRECTORIES( ../offline/cjson/ )
 
 file(GLOB CJSON_CFILES ../offline/cjson/*.c)
 file(GLOB CJSON_HFILES ../offline/cjson/*.h)
@@ -120,17 +127,11 @@ ${CJSON_HFILES}
 )
 
 ADD_EXECUTABLE( HLSLcc ${HLSLcc_SOURCES} )
+target_include_directories(HLSLcc
+    PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../offline/cjson>
+    )
 LIST(APPEND targets HLSLcc)
-
-# Compile 32-bit binaries for linux
-IF(CMAKE_HOST_UNIX)
-ADD_LIBRARY( libHLSLcc-i386 ${libHLSLcc_SOURCES} )
-ADD_EXECUTABLE( HLSLcc-i386 ${HLSLcc_SOURCES} )
-TARGET_LINK_LIBRARIES( HLSLcc-i386 libHLSLcc-i386)
-SET_TARGET_PROPERTIES(libHLSLcc-i386 PROPERTIES COMPILE_FLAGS -m32 LINK_FLAGS -m32 )
-SET_TARGET_PROPERTIES(HLSLcc-i386 PROPERTIES COMPILE_FLAGS -m32 LINK_FLAGS -m32 )
-ENDIF()
-
 TARGET_LINK_LIBRARIES( HLSLcc libHLSLcc)
 
 # Install target (will install the library to specified CMAKE_INSTALL_PREFIX variable)
@@ -138,11 +139,8 @@ install(TARGETS ${targets}
   EXPORT HLSLccConfig
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
-
-install(DIRECTORY "../include"
-  DESTINATION include
-  FILES_MATCHING PATTERN "*.*h")
+  RUNTIME DESTINATION bin
+  PUBLIC_HEADER DESTINATION include/HLSLcc)
 
 # This makes the project importable from the install directory
 # Put config file in per-project dir (name MUST match), can also
@@ -157,4 +155,3 @@ export(TARGETS libHLSLcc FILE HLSLccConfig.cmake)
 
 SET( CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
 "One of None Debug Release RelWithDebInfo MinSizeRel" FORCE )
-
